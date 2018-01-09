@@ -277,17 +277,19 @@ def read_data_file(data_file):
     data = []
     f_in = open(data_file, 'r')
 
-    for line_tmp in f_in.readlines(): 
+    for line_tmp in f_in.readlines():
         line_tmp = line_tmp.split(',')
+        if line_tmp[1] == 'Position':
+            continue
         # Read sequence 
-        line_seq = line_tmp[1]
+        line_seq = line_tmp[-2]
         # Check sequence 
         for base in line_seq:
             if(base not in baseDic.keys()):
                 print("Error in file {}: {} is not a legal base!".format(seq_file, base))
                 return ValueError
         # Read affinity
-        affinity = float(line_tmp[2])
+        affinity = float(line_tmp[-1])
         data.append((line_seq, affinity))
 
     f_in.close()
