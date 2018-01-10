@@ -286,8 +286,8 @@ def read_data_file(data_file):
         # Check sequence 
         for base in line_seq:
             if(base not in baseDic.keys()):
-                print("Error in file {}: {} is not a legal base!".format(seq_file, base))
-                return ValueError
+                print("Error in file {}: {} is not a legal base!".format(data_file, base))
+                raise ValueError
         # Read affinity
         affinity = float(line_tmp[-1])
         data.append((line_seq, affinity))
