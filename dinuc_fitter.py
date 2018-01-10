@@ -279,17 +279,18 @@ def read_data_file(data_file):
 
     for line_tmp in f_in.readlines():
         line_tmp = line_tmp.split(',')
-        if line_tmp[1] == 'Position':
-            continue
+        # Read the affinity
+        try:
+            affinity = float(line_tmp[-1])        
+        except ValueError:
+            continue    # affinity is not readable => skip header element 
         # Read sequence 
         line_seq = line_tmp[-2]
         # Check sequence 
         for base in line_seq:
             if(base not in baseDic.keys()):
-                print("Error in file {}: {} is not a legal base!".format(data_file, base))
+                print("Error in file {} line {}: {} is not a legal base!".format(data_file, line_tmp, base))
                 raise ValueError
-        # Read affinity
-        affinity = float(line_tmp[-1])
         data.append((line_seq, affinity))
 
     f_in.close()
