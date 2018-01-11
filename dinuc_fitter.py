@@ -105,7 +105,8 @@ class Motif:
                         pos_tmp = pos
                         base = baseDic[seq[pos]]
                         self.PWM[pos_tmp, base] = affinity_consensus / affinity
-                        break
+                        break        
+                
         if first_order:
             for site in sites_filtered:
                 seq = site[0]
@@ -335,11 +336,14 @@ def reverse_complement(seq):
 
 
 # A function for reading the sites of a single motif in a sequnce
-def predict_affinity(seq, motif, padding=False):
+def predict_affinity(seq, motif, target=False, padding=False):
 
     sites = annotate_sites([seq], motif, padding)
-    total_weight = sum([s[1] for s in sites])
-    return total_weight
+    if target == False:
+        weight_out = sum([s[1] for s in sites])
+    else: 
+        weight_out = max([s[1] for s in sites])
+    return weight_out
 
 
 def annotate_sites(seqs, motif, padding=False):
@@ -370,7 +374,6 @@ def annotate_sites(seqs, motif, padding=False):
             sites.append([seq_tmp, motif.score_site(seq_tmp), '+'])
             sites.append([reverse_complement(seq_tmp), motif.score_reverse_site(seq_tmp), '-'])
     sites_filtered = filter(lambda s: s[1] > 0, sites)    # ignore sites with zero binding weight
-
     return sites_filtered
 
 
@@ -399,10 +402,12 @@ def calc_SSE(oligomers, motif, print_results=False):
     n_oligomers = len(oligomers)
     affinity_measured = np.zeros(n_oligomers)
     affinity_predicted = np.zeros(n_oligomers)    
+    affinity_predicted_target = np.zeros(n_oligomers)        
     for idx, oligomer in enumerate(oligomers):
         affinity_measured[idx] = 1 / oligomer[1]
-        affinity_predicted[idx] = predict_affinity(oligomer[0], motif, padding=False)
-    
+        affinity_predicted[idx] = predict_affinity(oligomer[0], motif)
+        affinity_predicted_target[idx] = predict_affinity(oligomer[0], motif, target=True)
+            
     # calculate the scaling factor for the scale-free SSE
     beta = sum(affinity_measured * affinity_predicted) / sum(affinity_predicted * affinity_predicted)
     SSE = sum((affinity_measured - beta * affinity_predicted)**2) / n_oligomers
@@ -413,12 +418,14 @@ def calc_SSE(oligomers, motif, print_results=False):
         for idx, oligomer in enumerate(oligomers):
             meas = round(affinity_measured[idx] / scale, 3)
             pred = round(beta*affinity_predicted[idx] / scale,3)
-            list_results.append((oligomer[0], meas, pred, meas-pred))
+            pred_target = round(beta*affinity_predicted_target[idx] / scale,3)
+            list_results.append((oligomer[0], meas, pred, pred_target, meas-pred))
     
-        list_sorted =  sorted(list_results, key=lambda el:el[3])
+        list_sorted =  sorted(list_results, key=lambda el:el[-1])
 
+        print "oligo meas pred pred_max_site diff"
         for elem in list_sorted:
-            print elem[0], elem[1], elem[2], elem[3]    
+            print elem[0], elem[1], elem[2], elem[3], elem[4]    
             
     return SSE
         
@@ -461,24 +468,23 @@ def main(argv=None):
 
     # Determine the consensus
     motif.set_consensus(oligomers)
-    
     # Determine initial motif and crop it to a reasonable range
     motif.generate_motif_from_sites(oligomers)
     motif.crop_motif()
 
     print 'Iteration 0:', np.sqrt(calc_SSE(oligomers, motif))
     for idx in range(iterations):
-        motif.update_motif(oligomers, mode, first_order=True)
+        motif.update_motif(oligomers, mode, first_order=False)
         motif.normalize_motif()
         SSE = calc_SSE(oligomers, motif)
         print 'Iteration {}: {}'.format(idx+1, np.sqrt(SSE))
         
     motif.print_probability_file(output_file)
-    print motif.print_DPWM()    
-    print motif.calc_information_content()
+    #print motif.print_DPWM()    
+    #print motif.calc_information_content()
     
     # Predict the binding energies
-    #calc_SSE(oligomers, motif, print_results=True)
+    calc_SSE(oligomers, motif, print_results=True)
 
 if __name__ == '__main__':
     main(sys.argv[1:])  
