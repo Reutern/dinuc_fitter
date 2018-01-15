@@ -105,7 +105,8 @@ class Motif:
                         pos_tmp = pos
                         base = baseDic[seq[pos]]
                         self.PWM[pos_tmp, base] = affinity_consensus / affinity
-                        break        
+                        break   
+    
                 
         if first_order:
             for site in sites_filtered:
@@ -435,17 +436,19 @@ def main(argv=None):
     output_file = '.'
     iterations = 4
     mode = 0
+    print_results = False
     
     doc_string = 'dinuc_fitter.py -i <input_data> -o <output_file> '
-
+    doc_string_optional = '-s <iterations> -m <mode> -p <print results>'
+    
     try:
-        opts, args = getopt.getopt(argv,"hi:o:s:m:",[])
+        opts, args = getopt.getopt(argv,"hi:o:s:m:p",[])
     except getopt.GetoptError:
-        print doc_string
+        print doc_string + doc_string_optional
         sys.exit(2)
     for opt, arg in opts:
         if opt == '-h':
-            print doc_string
+            print doc_string + doc_string_optional
             sys.exit()
         elif opt in ("-i"):
             data_file = arg
@@ -455,6 +458,9 @@ def main(argv=None):
             iterations = int(arg)
         elif opt in ("-m"):
             mode = int(arg)
+        elif opt in ("-p"):
+            print_results = True
+                        
             
     if mode not in [0,1,2]:
         print("Error: mode {} is not a valid input!\nChoose between 0 (standard mode, default), 1 (palindrome mode), 2 (strict palindrome mode)".format(mode) )        
@@ -480,11 +486,15 @@ def main(argv=None):
         print 'Iteration {}: {}'.format(idx+1, np.sqrt(SSE))
         
     motif.print_probability_file(output_file)
-    #print motif.print_DPWM()    
-    #print motif.calc_information_content()
-    
-    # Predict the binding energies
-    calc_SSE(oligomers, motif, print_results=True)
+
+    if print_results:
+        # Predict the binding energies
+        calc_SSE(oligomers, motif, print_results=True)
+        print("Motif")    
+        motif.print_PWM()
+        motif.print_DPWM() 
+        print("Information Content")
+        print motif.calc_information_content()
 
 if __name__ == '__main__':
     main(sys.argv[1:])  
