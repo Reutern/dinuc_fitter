@@ -457,7 +457,7 @@ def calc_SSE(oligomers, motif, print_results=False):
     affinity_predicted_target = np.zeros(n_oligomers)        
     for idx, oligomer in enumerate(oligomers):
         affinity_measured[idx] = 1 / oligomer[1]
-        affinity_predicted[idx] = predict_affinity(oligomer[0], motif)
+        affinity_predicted[idx] = predict_affinity(seq_tmp, motif)
         affinity_predicted_target[idx] = predict_affinity(oligomer[0], motif, target=True)
             
     # calculate the scaling factor for the scale-free SSE
@@ -529,7 +529,7 @@ def main(argv=None):
     motif.generate_motif_from_sites(oligomers)
     motif.crop_motif()
 
-    print 'Iteration 0:', np.sqrt(calc_SSE(oligomers, motif))
+    print 'Iteration 0:', calc_SSE(oligomers, motif)
     for idx in range(iterations):
         motif.update_motif(oligomers, mode, first_order=True)
         motif.normalize_motif()
