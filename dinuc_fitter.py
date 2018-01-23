@@ -105,7 +105,7 @@ class Motif:
                         pos_tmp = pos
                         base = baseDic[seq[pos]]
                         self.PWM[pos_tmp, base] = affinity_consensus / affinity
-                        break   
+                        break      
     
                 
         if first_order:
@@ -273,6 +273,57 @@ class Motif:
 
         return (ic_0, ic-ic_0)
         
+
+# Subclass of Motif that describes strict Palindrom Motifs
+class PalindromeMotif(Motif):
+    consensus_full = ''
+    n_pos_full = 0
+    
+    def __init__(self, n_pos_tmp):
+        super().__init__(self, n_pos_tmp)
+        n_pos_full = 2 * n_pos_tmp
+
+    def score_site(self, seq, first_order=True):
+        if len(seq) != self.n_pos_full:
+            print("Error: sequence length {} does not fit PWM length {}.".format(len(seq), n_pos_full))
+            return RuntimeError    
+        seq_1 = seq[0:n_pos]
+        seq_2 = seq[n_pos:n_pos_full]              
+        weight_1 = super().score_site(self, seq, first_order)
+        weight_2 = super().score_reverse_site(self, seq, first_order)
+        return weight_1 * weight_2
+                
+    def set_consensus(self, sites):
+        consensus_tmp = super().set_consensus(self, sites)
+        consensus_full = consensus_tmp + reverse_complement(consensus_tmp)
+
+    def generate_motif_from_sites(self, sites, first_order=False):
+        sites_split = split_sites(sites)
+        super().generate_motif_from_sites(self, sites_splitted, first_order) 
+
+    def calc_information_content(self):
+        (ic_0_tmp, ic_1_tmp) = super().calc_information_content(self)
+        return (ic_0_tmp * 2, ic_1_tmp * 2)
+
+
+
+# Split a list of sites for the PalindromMotif class
+def split_sites(sites):
+    if len(sites[0][0]) % 2 == 0:
+        print("Error: site length {}! Split_sites() can split even site lengths only.".format(len(sites[0])))
+        return RuntimeError
+    len_half = len(sites[0]) / 2    
+    sites_split = []
+    for site in sites:
+        if len(site[0]) != 2*len_half:
+            return RuntimeError
+        site_1_seq = site[0][0:len_half]
+        site_2_seq = site[len_half:-1]
+        site_tmp_affinity = np.sqrt(site[1])
+        sites_split.append((site_1_seq, site_tmp_affinity))
+        sites_split.append((site_2_seq, site_tmp_affinity))        
+    return sites_split
+    
                     
 # A function that reads the input sequences in the FASTA format and the measured affinities
 def read_data_file(data_file):
@@ -480,7 +531,7 @@ def main(argv=None):
 
     print 'Iteration 0:', np.sqrt(calc_SSE(oligomers, motif))
     for idx in range(iterations):
-        motif.update_motif(oligomers, mode, first_order=False)
+        motif.update_motif(oligomers, mode, first_order=True)
         motif.normalize_motif()
         SSE = calc_SSE(oligomers, motif)
         print 'Iteration {}: {}'.format(idx+1, np.sqrt(SSE))
