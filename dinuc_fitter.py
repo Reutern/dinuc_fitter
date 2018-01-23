@@ -334,7 +334,7 @@ def read_data_file(data_file):
         line_tmp = line_tmp.split(',')
         # Read the affinity
         try:
-            affinity = float(line_tmp[-1])        
+            diss_constant = float(line_tmp[-1])        
         except ValueError:
             continue    # affinity is not readable => skip header element 
         # Read sequence 
@@ -344,7 +344,7 @@ def read_data_file(data_file):
             if(base not in baseDic.keys()):
                 print("Error in file {} line {}: {} is not a legal base!".format(data_file, line_tmp, base))
                 raise ValueError
-        data.append((line_seq, affinity))
+        data.append((line_seq, diss_constant))
 
     f_in.close()
     return data
@@ -457,7 +457,7 @@ def calc_SSE(oligomers, motif, print_results=False):
     affinity_predicted_target = np.zeros(n_oligomers)        
     for idx, oligomer in enumerate(oligomers):
         affinity_measured[idx] = 1 / oligomer[1]
-        affinity_predicted[idx] = predict_affinity(seq_tmp, motif)
+        affinity_predicted[idx] = predict_affinity(oligomer[0], motif)
         affinity_predicted_target[idx] = predict_affinity(oligomer[0], motif, target=True)
             
     # calculate the scaling factor for the scale-free SSE
