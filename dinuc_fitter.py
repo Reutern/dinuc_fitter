@@ -479,7 +479,39 @@ def calc_SSE(oligomers, motif, print_results=False):
             print elem[0], elem[1], elem[2], elem[3], elem[4]    
             
     return SSE
-       
+
+# The objective function sum of squared errors SSE
+def calc_energy_SSE(oligomers, motif, print_results=False):
+    n_oligomers = len(oligomers)
+    energy_measured = np.zeros(n_oligomers)
+    energy_predicted = np.zeros(n_oligomers)    
+    energy_predicted_target = np.zeros(n_oligomers)  
+    # alpha = exp(E + E_0)  [RT=1]      
+    for idx, oligomer in enumerate(oligomers):
+        energy_measured[idx] = np.log(oligomer[1]) 
+        energy_predicted[idx] = -np.log(predict_affinity(oligomer[0], motif))
+        energy_predicted_target[idx] = -np.log(predict_affinity(oligomer[0], motif, target=True))
+            
+    # calculate the scaling factor for the scale-free SSE
+    norm = sum(energy_predicted * energy_predicted)
+    beta = sum(energy_measured * energy_predicted) / norm
+    SSE = sum((energy_measured - beta * energy_predicted)**2) / n_oligomers
+
+    if print_results:
+        list_results = []
+        scale = 1 # max(energy_measured)
+        for idx, oligomer in enumerate(oligomers):
+            meas = round(energy_measured[idx] / scale, 3)
+            pred = round(beta*energy_predicted[idx] / scale,3)
+            pred_target = round(beta*energy_predicted_target[idx] / scale,3)
+            list_results.append((oligomer[0], meas, pred, pred_target, meas-pred))
+        list_sorted =  sorted(list_results, key=lambda el:el[-1])
+
+        print "oligo meas pred pred_max_site diff"
+        for elem in list_sorted:
+            print elem[0], elem[1], elem[2], elem[3], elem[4]    
+            
+    return SSE       
         
 def obj_func(param, args):
     n_tmp = (len(param) + 16) / 20  # 4N + 16(n-1) = len(param)
@@ -487,7 +519,7 @@ def obj_func(param, args):
     motif_param.PWM = param[0:n_tmp*4].reshape([n_tmp,4])
     motif_param.DPWM = param[n_tmp*4:].reshape([n_tmp-1,16])
     motif_param.normalize_motif()
-    score = calc_SSE(args, motif_param)
+    score = calc_energy_SSE(args, motif_param)
     return score
 
 
@@ -537,19 +569,19 @@ def main(argv=None):
     motif.generate_motif_from_sites(oligomers)
     motif.crop_motif()
     n_pos = motif.n_pos
-    print 'Iteration 0:', calc_SSE(oligomers, motif)
+    print 'Iteration 0:', calc_energy_SSE(oligomers, motif)
     param_ini = list(motif.PWM.ravel()) + list(motif.DPWM.ravel())
-    result = minimize(obj_func, param_ini, args=oligomers, method='L-BFGS-B', tol=1e-6,bounds=[(1e-5,100)]*(len(param_ini)))
+    result = minimize(obj_func, param_ini, args=oligomers, method='L-BFGS-B', tol=1e-2,bounds=[(1e-5,100)]*(len(param_ini)))
     param = result['x']
     motif.PWM = param[0:4*n_pos].reshape([n_pos,4])
     motif.DPWM = param[4*n_pos:].reshape([n_pos-1,16])    
-    print 'Iteration 1:', calc_SSE(oligomers, motif)    
+    print 'Iteration 1:', calc_energy_SSE(oligomers, motif)    
         
     motif.print_probability_file(output_file)
 
     if print_results:
         # Predict the binding energies
-        calc_SSE(oligomers, motif, print_results=True)
+        calc_energy_SSE(oligomers, motif, print_results=True)
         print("Motif")    
         motif.print_PWM()
         motif.print_DPWM() 
