@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sys, getopt
 import os.path
+from scipy.optimize import minimize
 plt.style.use('ggplot')
 plt.rcParams['axes.facecolor']='w'
 
@@ -93,20 +94,15 @@ class Motif:
         self.n_pos = len(sites[0][0])
         self.PWM = np.ones([self.n_pos, 4])
         self.DPWM = np.ones([self.n_pos-1, 16])
-        for site in sites_filtered:
-            seq = site[0]
-            affinity = site[1]
-            if count_mutations(seq, self.consensus) == 1:
-                # find mutation in seq
-                pos_tmp = 0
-                base_tmp = 0
-                for pos in range(self.n_pos):
-                    if seq[pos] != self.consensus[pos]:
-                        pos_tmp = pos
-                        base = baseDic[seq[pos]]
-                        self.PWM[pos_tmp, base] = affinity_consensus / affinity
-                        break      
-    
+        for pos in range(self.n_pos):
+            weights_tmp = np.zeros(4)
+            for site in sites:
+                base_tmp = baseDic[site[0][pos]]
+                affinity_tmp = site[1]
+                weights_tmp[base_tmp] += 1/affinity_tmp
+            if max(weights_tmp) == sum(weights_tmp):    # The whole weight is concentrated in one base => no mutations
+                continue
+            self.PWM[pos,:] = 4 * weights_tmp / sum(weights_tmp)   
                 
         if first_order:
             for site in sites_filtered:
@@ -164,7 +160,7 @@ class Motif:
             for site in sites_tmp:
                 seq_site_tmp = site[0]
                 weight_fraction = site[1] / weight_sum
-                affinity_site_tmp = 1 / (weight_fraction / affinity_tmp)
+                affinity_site_tmp = affinity_tmp / weight_fraction 
                 sites.append((seq_site_tmp, affinity_site_tmp))
 
         self.generate_motif_from_sites(sites, first_order)
@@ -237,7 +233,10 @@ class Motif:
         for pos in range(self.n_pos):
             row = self.PWM[pos, :] / sum(self.PWM[pos, :])
             for base in range(4):
-                ic_0 += row[base]*np.log2(row[base]/0.25)
+                if row[base] == 0:
+                    ic_0 += 0
+                else:
+                    ic_0 += row[base]*np.log2(row[base]/0.25)
 
         ic_1 = 0
         for pos in range(self.n_pos-1):
@@ -480,7 +479,17 @@ def calc_SSE(oligomers, motif, print_results=False):
             print elem[0], elem[1], elem[2], elem[3], elem[4]    
             
     return SSE
+       
         
+def obj_func(param, args):
+    n_tmp = (len(param) + 16) / 20  # 4N + 16(n-1) = len(param)
+    motif_param = Motif(7)
+    motif_param.PWM = param[0:n_tmp*4].reshape([n_tmp,4])
+    motif_param.DPWM = param[n_tmp*4:].reshape([n_tmp-1,16])
+    motif_param.normalize_motif()
+    score = calc_SSE(args, motif_param)
+    return score
+
 
 def main(argv=None):
     data_file = ''
@@ -519,7 +528,6 @@ def main(argv=None):
 
     oligomers_all = read_data_file(data_file)
     oligomers = average_sites(oligomers_all)
-
     # Initialize the Motif class
     motif = Motif(1) 
 
@@ -528,13 +536,14 @@ def main(argv=None):
     # Determine initial motif and crop it to a reasonable range
     motif.generate_motif_from_sites(oligomers)
     motif.crop_motif()
-
+    n_pos = motif.n_pos
     print 'Iteration 0:', calc_SSE(oligomers, motif)
-    for idx in range(iterations):
-        motif.update_motif(oligomers, mode, first_order=True)
-        motif.normalize_motif()
-        SSE = calc_SSE(oligomers, motif)
-        print 'Iteration {}: {}'.format(idx+1, np.sqrt(SSE))
+    param_ini = list(motif.PWM.ravel()) + list(motif.DPWM.ravel())
+    result = minimize(obj_func, param_ini, args=oligomers, method='L-BFGS-B', tol=1e-6,bounds=[(1e-5,100)]*(len(param_ini)))
+    param = result['x']
+    motif.PWM = param[0:4*n_pos].reshape([n_pos,4])
+    motif.DPWM = param[4*n_pos:].reshape([n_pos-1,16])    
+    print 'Iteration 1:', calc_SSE(oligomers, motif)    
         
     motif.print_probability_file(output_file)
 
